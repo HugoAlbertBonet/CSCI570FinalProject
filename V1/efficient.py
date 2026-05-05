@@ -136,7 +136,7 @@ def efficient_alignment(x, y):
         return "_" * len(y), y
     if len(y) == 0:
         return x, "_" * len(x)
-    if len(x) == 1 or len(y) == 1:
+    if len(x) <= 1000 or len(y) <= 1000:
         return basic_alignment_small(x, y)
 
     mid = len(x) // 2

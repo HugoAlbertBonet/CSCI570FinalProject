@@ -13,8 +13,10 @@ Script with everyting needed to run the memory-inefficient algorithm (just DP):
     5. Memory in Kilobytes (Float)
 
 """
+halbertb@usc.edu
 
 # Hard coded costs
+DELTA = 30
 COST = {
         'A': {'A': 0, 'C': 110, 'G': 48, 'T': 94},
         'C': {'A': 110, 'C': 0, 'G': 118, 'T': 48},
