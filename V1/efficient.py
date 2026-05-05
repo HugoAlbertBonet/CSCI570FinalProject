@@ -1,7 +1,6 @@
-import os
-import resource
 import sys
 import time
+import psutil
 
 
 DELTA = 30
@@ -19,20 +18,13 @@ def parse_input(file_path):
 
     base_strings = []
     index_groups = []
-    current_indices = None
 
     for line in lines:
         if all(ch in "ACGT" for ch in line):
             base_strings.append(line)
-            current_indices = []
-            index_groups.append(current_indices)
-        elif line.isdigit() and current_indices is not None:
-            current_indices.append(int(line))
-        else:
-            raise ValueError("Invalid input format")
-
-    if len(base_strings) != 2:
-        raise ValueError("Input must contain exactly two base strings")
+            index_groups.append([])
+        elif line.isdigit():
+            index_groups[-1].append(int(line))
 
     return (
         generate_string(base_strings[0], index_groups[0]),
@@ -47,21 +39,17 @@ def generate_string(base, indices):
     return result
 
 
-def alpha_cost(a, b):
-    return ALPHA[a][b]
-
-
 def alignment_cost(aligned_x, aligned_y):
     total = 0
     for a, b in zip(aligned_x, aligned_y):
         if a == "_" or b == "_":
             total += DELTA
         else:
-            total += alpha_cost(a, b)
+            total += ALPHA[a][b]
     return total
 
 
-def basic_alignment_small(x, y):
+def base_dp_alignment(x, y):
     m = len(x)
     n = len(y)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
@@ -75,7 +63,7 @@ def basic_alignment_small(x, y):
         xi = x[i - 1]
         for j in range(1, n + 1):
             dp[i][j] = min(
-                dp[i - 1][j - 1] + alpha_cost(xi, y[j - 1]),
+                dp[i - 1][j - 1] + ALPHA[xi][y[j - 1]],
                 dp[i - 1][j] + DELTA,
                 dp[i][j - 1] + DELTA,
             )
@@ -86,7 +74,7 @@ def basic_alignment_small(x, y):
     j = n
 
     while i > 0 and j > 0:
-        mismatch = alpha_cost(x[i - 1], y[j - 1])
+        mismatch = ALPHA[x[i - 1]][y[j - 1]]
         if dp[i][j] == dp[i - 1][j - 1] + mismatch:
             aligned_x.append(x[i - 1])
             aligned_y.append(y[j - 1])
@@ -114,19 +102,20 @@ def basic_alignment_small(x, y):
     return "".join(reversed(aligned_x)), "".join(reversed(aligned_y))
 
 
-def linear_space_cost(x, y):
-    previous = [j * DELTA for j in range(len(y) + 1)]
+def linear_bottom_up(x, y):
+    n = len(y)
+    previous = [j * DELTA for j in range(n + 1)]
+    current = [0] * (n + 1)
 
     for i, xi in enumerate(x, start=1):
-        current = [0] * (len(y) + 1)
         current[0] = i * DELTA
         for j, yj in enumerate(y, start=1):
             current[j] = min(
-                previous[j - 1] + alpha_cost(xi, yj),
+                previous[j - 1] + ALPHA[xi][yj],
                 previous[j] + DELTA,
                 current[j - 1] + DELTA,
             )
-        previous = current
+        previous, current = current, previous
 
     return previous
 
@@ -136,15 +125,15 @@ def efficient_alignment(x, y):
         return "_" * len(y), y
     if len(y) == 0:
         return x, "_" * len(x)
-    if len(x) <= 1000 or len(y) <= 1000:
-        return basic_alignment_small(x, y)
+    if len(x) * len(y) <= 2_000_000:
+        return base_dp_alignment(x, y)
 
     mid = len(x) // 2
     x_left = x[:mid]
     x_right = x[mid:]
 
-    forward = linear_space_cost(x_left, y)
-    backward = linear_space_cost(x_right[::-1], y[::-1])
+    forward = linear_bottom_up(x_left, y)
+    backward = linear_bottom_up(x_right[::-1], y[::-1])
 
     split = min(
         range(len(y) + 1),
@@ -158,16 +147,9 @@ def efficient_alignment(x, y):
 
 
 def memory_kb():
-    try:
-        import psutil
-
-        process = psutil.Process(os.getpid())
-        return process.memory_info().rss / 1024.0
-    except ImportError:
-        usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        if sys.platform == "darwin":
-            return usage / 1024.0
-        return float(usage)
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    return int(memory_info.rss / 1024)
 
 
 def write_output(output_path, cost, aligned_x, aligned_y, time_ms, used_memory_kb):

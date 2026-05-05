@@ -50,9 +50,7 @@ PYEOF
 
 echo "input,problem_size,basic_time_ms,basic_memory_kb,efficient_time_ms,efficient_memory_kb" > "$CSV_FILE"
 
-INPUT_FILES=$(ls "$DATAPOINTS_DIR"/in*.txt | sort -V)
-
-for input_path in $INPUT_FILES; do
+ls "$DATAPOINTS_DIR"/in*.txt | sort -V | while IFS= read -r input_path; do
     name=$(basename "$input_path" .txt)
     echo "Processing $name..."
 
